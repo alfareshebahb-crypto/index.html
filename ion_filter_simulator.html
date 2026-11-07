@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Ion Filter Simulator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: #161b22;
+            border-radius: 12px;
+            border: 1px solid #30363d;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .title {
+            font-size: 1.4rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .legend {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9rem;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot.light { background-color: #ff4a6b; }
+        .dot.target { background-color: #00cc88; }
+        .dot.heavy { background-color: #4a90e2; }
+        
+        .sim-space {
+            position: relative;
+            width: 100%;
+            height: 320px;
+            background-color: #090d13;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #21262d;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .telemetry {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            text-align: center;
+            margin: 15px 0;
+            background: #090d13;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #21262d;
+        }
+        .tel-val {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .tel-val.passed { color: #00cc88; }
+        .tel-val.light-f { color: #ff4a6b; }
+        .tel-val.heavy-f { color: #4a90e2; }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .control-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.95rem;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: #21262d;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #58a6ff;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            background: #79c0ff;
+        }
+        .btn-row {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        button {
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button:hover {
+            background-color: #30363d;
+            border-color: #8b949e;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div class="title">🎬 Quadrupole Ion Filter Simulator</div>
+        <div class="legend">
+            <div class="legend-item"><span class="dot light"></span> Light</div>
+            <div class="legend-item"><span class="dot target"></span> Target</div>
+            <div class="legend-item"><span class="dot heavy"></span> Heavy</div>
+        </div>
+    </div>
+
+    <div class="sim-space">
+        <canvas id="simCanvas"></canvas>
+    </div>
+
+    <div class="telemetry">
+        <div>
+            <div style="color: #8b949e; font-size: 0.85rem;">Stable Passed</div>
+            <div class="tel-val passed" id="passedCount">0</div>
+        </div>
+        <div>
+            <div style="color: #8b949e; font-size: 0.85rem;">Light Filtered</div>
+            <div class="tel-val light-f" id="lightCount">0</div>
+        </div>
+        <div>
+            <div style="color: #8b949e; font-size: 0.85rem;">Heavy Filtered</div>
+            <div class="tel-val heavy-f" id="heavyCount">0</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <div class="control-label-row">
+                <span>Target Mass (m/z)</span>
+                <span id="massVal">33 u</span>
+            </div>
+            <input type="range" id="massSlider" min="10" max="200" value="33">
+        </div>
+        <div class="control-group">
+            <div class="control-label-row">
+                <span>RF Voltage (V_rf)</span>
+                <span id="rfVal">250 V</span>
+            </div>
+            <input type="range" id="rfSlider" min="50" max="500" value="250">
+        </div>
+        <div class="control-group">
+            <div class="control-label-row">
+                <span>DC Resolution Bias (U)</span>
+                <span id="dcVal">42 V</span>
+            </div>
+            <input type="range" id="dcSlider" min="0" max="100" value="42">
+        </div>
+        <div class="control-group">
+            <div class="control-label-row">
+                <span>RF Field Frequency (ω)</span>
+                <span id="freqVal">4.0 MHz</span>
+            </div>
+            <input type="range" id="freqSlider" min="10" max="100" value="40">
+        </div>
+    </div>
+
+    <div class="btn-row">
+        <button id="clearBtn">Clear Telemetry Counters</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Telemetry counts
+    let passed = 0;
+    let lightFiltered = 0;
+    let heavyFiltered = 0;
+
+    // Control Elements
+    const massSlider = document.getElementById('massSlider');
+    const rfSlider = document.getElementById('rfSlider');
+    const dcSlider = document.getElementById('dcSlider');
+    const freqSlider = document.getElementById('freqSlider');
+
+    const massVal = document.getElementById('massVal');
+    const rfVal = document.getElementById('rfVal');
+    const dcVal = document.getElementById('dcVal');
+    const freqVal = document.getElementById('freqVal');
+
+    const passedCount = document.getElementById('passedCount');
+    const lightCount = document.getElementById('lightCount');
+    const heavyCount = document.getElementById('heavyCount');
+    const clearBtn = document.getElementById('clearBtn');
+
+    // Simulation settings
+    let targetMassSetting = parseInt(massSlider.value);
+    let v_rf = parseInt(rfSlider.value);
+    let u_dc = parseInt(dcSlider.value);
+    let freq = parseFloat(freqSlider.value) / 10;
+
+    // Manage particles
+    let particles = [];
+    let cycleTime = 0;
+
+    function resizeCanvas() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Listeners
+    massSlider.addEventListener('input', (e) => {
+        targetMassSetting = parseInt(e.target.value);
+        massVal.innerText = targetMassSetting + " u";
+    });
+    rfSlider.addEventListener('input', (e) => {
+        v_rf = parseInt(e.target.value);
+        rfVal.innerText = v_rf + " V";
+    });
+    dcSlider.addEventListener('input', (e) => {
+        u_dc = parseInt(e.target.value);
+        dcVal.innerText = u_dc + " V";
+    });
+    freqSlider.addEventListener('input', (e) => {
+        freq = parseFloat(e.target.value) / 10;
+        freqVal.innerText = freq.toFixed(1) + " MHz";
+    });
+    clearBtn.addEventListener('click', () => {
+        passed = 0; lightFiltered = 0; heavyFiltered = 0;
+        passedCount.innerText = '0'; lightCount.innerText = '0'; heavyCount.innerText = '0';
+    });
+
+    class Particle {
+        constructor(type) {
+            this.type = type; // 'light', 'target', 'heavy'
+            this.x = 40;
+            this.y = canvas.height / 2 + (Math.random() * 10 - 5);
+            this.vx = 2.5;
+            this.vy = Math.random() * 0.4 - 0.2;
+            this.history = [];
+            this.active = true;
+
+            if (type === 'light') {
+                this.mass = targetMassSetting * 0.25;
+                this.radius = 4;
+                this.color = '#ff4a6b';
+            } else if (type === 'heavy') {
+                this.mass = targetMassSetting * 3.5;
+                this.radius = 9;
+                this.color = '#4a90e2';
+            } else {
+                this.mass = targetMassSetting;
+                this.radius = 6;
+                this.color = '#00cc88';
+            }
+        }
+
+        update() {
+            if (!this.active) return;
+
+            this.history.push({x: this.x, y: this.y});
+            if (this.history.length > 30) this.history.shift();
+
+            // Electric field forces
+            let rfField = Math.sin(cycleTime * freq);
+            let forceY = 0;
+
+            if (this.type === 'light') {
+                // Highly dynamic response to RF, frequency dampens this
+                let sensitivity = (v_rf / this.mass) * (1 / (freq * 0.5));
+                forceY += rfField * sensitivity * 0.08;
+            } else if (this.type === 'heavy') {
+                // Ignores high-frequency RF, pulled steadily by DC baseline bias
+                let dcPull = (u_dc / this.mass) * 1.5;
+                forceY += (this.y > canvas.height / 2 ? dcPull : -dcPull) * 0.05;
+            } else {
+                // Balanced target mass trajectory
+                let rfEffect = Math.sin(cycleTime * freq) * (v_rf / this.mass) * 0.02;
+                let idealRatio = 0.168; 
+                let currentRatio = u_dc / v_rf;
+                let deviation = currentRatio - idealRatio;
+                
+                forceY += rfEffect + (deviation * (this.y - canvas.height/2) * 0.01);
+            }
+
+            this.vy += forceY;
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // Filtration thresholds (Rods visual boundaries)
+            if (this.y < 55 || this.y > canvas.height - 55) {
+                this.active = false;
+                if (this.type === 'light') { lightFiltered++; lightCount.innerText = lightFiltered; }
+                else if (this.type === 'heavy') { heavyFiltered++; heavyFilteredCount(); }
+                else { 
+                    // Target filtered out if unstable settings
+                    if (Math.random() > 0.5) { lightFiltered++; lightCount.innerText = lightFiltered; }
+                    else { heavyFiltered++; heavyFilteredCount(); }
+                }
+            }
+
+            if (this.x > canvas.width - 40) {
+                this.active = false;
+                if (this.type === 'target') {
+                    passed++;
+                    passedCount.innerText = passed;
+                } else if (this.type === 'light') {
+                    // Small chance non-filtered escapes if parameters allow
+                    passed++; passedCount.innerText = passed;
+                }
+            }
+        }
+
+        draw() {
+            ctx.beginPath();
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 0.3;
+            for(let i=0; i<this.history.length; i++) {
+                if (i===0) ctx.moveTo(this.history[i].x, this.history[i].y);
+                else ctx.lineTo(this.history[i].x, this.history[i].y);
+            }
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = 1.0;
+            ctx.fill();
+        }
+    }
+
+    function heavyFilteredCount() {
+        heavyCount.innerText = heavyFiltered;
+    }
+
+    function animate() {
+        cycleTime += 0.1;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Rod Profiles
+        let rfState = Math.sin(cycleTime * freq);
+        ctx.fillStyle = '#1f242c';
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#30363d';
+
+        // Top Rod
+        ctx.fillRect(80, 15, canvas.width - 160, 35);
+        ctx.strokeRect(80, 15, canvas.width - 160, 35);
+        
+        // Bottom Rod
+        ctx.fillRect(80, canvas.height - 50, canvas.width - 160, 35);
+        ctx.strokeRect(80, canvas.height - 50, canvas.width - 160, 35);
+
+        // Charge Indicators (+ / -)
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 14px monospace';
+        ctx.textAlign = 'center';
+        let chargeText = rfState > 0 ? '( + )' : '( − )';
+        ctx.fillText("Top Rod " + chargeText, canvas.width / 2, 37);
+        ctx.fillText("Bottom Rod " + chargeText, canvas.width / 2, canvas.height - 28);
+
+        // Grid accents
+        ctx.beginPath();
+        ctx.strokeStyle = '#21262d';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.moveTo(40, canvas.height/2);
+        ctx.lineTo(canvas.width - 40, canvas.height/2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Labels
+        ctx.fillStyle = '#8b949e';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText("ION SOURCE", 15, canvas.height / 2 - 12);
+        ctx.textAlign = 'right';
+        ctx.fillText("MASS DETECTOR", canvas.width - 15, canvas.height / 2 - 12);
+
+        // Spawn particles
+        if (Math.random() < 0.12) {
+            let r = Math.random();
+            if (r < 0.33) particles.push(new Particle('light'));
+            else if (r < 0.66) particles.push(new Particle('heavy'));
+            else particles.push(new Particle('target'));
+        }
+
+        // Process particles
+        particles.forEach(p => {
+            p.update();
+            p.draw();
+        });
+        particles = particles.filter(p => p.active);
+
+        requestAnimationFrame(animate);
+    }
+
+    animate();
+</script>
+
+</body>
+</html>
